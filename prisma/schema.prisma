@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  provider     String? // "local" | "google" | "kakao"
+  providerId   String?
+  name         String?
+  createdAt    DateTime @default(now())
+
+  wordEntries  WordEntry[]
+  stories      Story[]
+  comments     Comment[]
+  votes        Vote[]
+}
+
+model WordEntry {
+  id        String   @id @default(cuid())
+  word      String
+  meaning   String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  stories   Story[]
+
+  @@index([userId])
+}
+
+model Story {
+  id          String   @id @default(cuid())
+  content     String
+  imageUrl    String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  wordEntryId String
+  wordEntry   WordEntry @relation(fields: [wordEntryId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  comments    Comment[]
+  votes       Vote[]
+
+  @@index([userId])
+  @@index([wordEntryId])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  content   String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  storyId   String
+  story     Story     @relation(fields: [storyId], references: [id])
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime  @default(now())
+
+  @@index([storyId])
+  @@index([parentId])
+}
+
+// User <-> Story 업보트: N:M 관계를 나타내는 조인 테이블
+model Vote {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, storyId])
+}
