@@ -10,9 +10,12 @@ datasource db {
 
 model User {
   id           String   @id @default(cuid())
-  email        String   @unique
+  // 로컬 회원가입은 email이 필수지만, 카카오 로그인은 이메일 동의항목이
+  // 비즈 앱 전환 승인 전까지 제공되지 않을 수 있어 선택값으로 둔다.
+  // (unique는 유지해도 안전 — Postgres는 NULL끼리는 중복으로 취급하지 않음)
+  email        String?  @unique
   passwordHash String?
-  provider     String? // "local" | "google" | "kakao"
+  provider     String?  // "local" | "google" | "kakao"
   providerId   String?
   name         String?
   createdAt    DateTime @default(now())
@@ -21,6 +24,9 @@ model User {
   stories      Story[]
   comments     Comment[]
   votes        Vote[]
+
+  // 같은 소셜 계정으로 중복 가입되는 것을 막는 실질적인 식별자
+  @@unique([provider, providerId])
 }
 
 model WordEntry {
