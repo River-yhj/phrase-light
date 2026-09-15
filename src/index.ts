@@ -9,6 +9,13 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 
+// .env에 키는 있지만 값이 비어 있는 경우가 있어 ??(null 병합)로는 걸러지지 않는다.
+// 빈 문자열까지 미설정으로 보고, 운영 환경에서는 아예 기동을 막는다.
+const sessionSecret = process.env.SESSION_SECRET?.trim() || "dev-secret";
+if (isProduction && sessionSecret === "dev-secret") {
+  throw new Error("운영 환경에서는 SESSION_SECRET을 반드시 설정해야 합니다.");
+}
+
 app.use(
   cors({
     origin: process.env.CLIENT_ORIGIN,
@@ -18,7 +25,7 @@ app.use(
 app.use(express.json());
 app.use(
   session({
-    secret: process.env.SESSION_SECRET ?? "dev-secret",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
