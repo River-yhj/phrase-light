@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import type { Request } from "express";
 import { Prisma, type User } from "@prisma/client";
 import { prisma } from "./prisma.js";
 
@@ -60,4 +61,15 @@ export async function findOrCreateOAuthUser(profile: OAuthProfile): Promise<User
     // email만 비워 둔 채로 생성한다. (계정 연동은 별도 기능으로 다룰 문제)
     return prisma.user.create({ data: { provider, providerId, email: null, name } });
   }
+}
+
+/**
+ * requireAuth를 통과한 요청에서 로그인 사용자 id를 꺼낸다.
+ * requireAuth 없이 호출됐다면 라우터 설정 실수이므로 500으로 드러나게 한다.
+ */
+export function getUserId(req: Request): string {
+  if (!req.isAuthenticated()) {
+    throw new Error("getUserId는 requireAuth 미들웨어 뒤에서만 호출해야 합니다.");
+  }
+  return req.user.id;
 }

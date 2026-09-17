@@ -15,15 +15,15 @@ model User {
   // (unique는 유지해도 안전 — Postgres는 NULL끼리는 중복으로 취급하지 않음)
   email        String?  @unique
   passwordHash String?
-  provider     String?  // "local" | "google" | "kakao"
+  provider     String? // "local" | "google" | "kakao"
   providerId   String?
   name         String?
   createdAt    DateTime @default(now())
 
-  wordEntries  WordEntry[]
-  stories      Story[]
-  comments     Comment[]
-  votes        Vote[]
+  wordEntries WordEntry[]
+  stories     Story[]
+  comments    Comment[]
+  votes       Vote[]
 
   // 같은 소셜 계정으로 중복 가입되는 것을 막는 실질적인 식별자
   @@unique([provider, providerId])
@@ -31,19 +31,21 @@ model User {
 
 model WordEntry {
   id        String   @id @default(cuid())
-  word      String
+  // 같은 단어가 여러 WordEntry로 쪼개지지 않도록 unique 제약을 건다.
+  // 등록 API는 반드시 find-or-create(이미 있으면 재사용)로 구현한다.
+  word      String   @unique
   meaning   String?
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
 
-  stories   Story[]
+  stories Story[]
 
   @@index([userId])
 }
 
 model Story {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   content     String
   imageUrl    String?
   userId      String
@@ -52,11 +54,16 @@ model Story {
   wordEntry   WordEntry @relation(fields: [wordEntryId], references: [id])
   createdAt   DateTime  @default(now())
 
-  comments    Comment[]
-  votes       Vote[]
+  // Vote 개수를 매번 집계하지 않고 미리 계산해두는 카운터.
+  // 투표/취소 시 트랜잭션으로 Vote 생성·삭제와 함께 +1/-1 갱신한다.
+  voteCount Int @default(0)
+
+  comments Comment[]
+  votes    Vote[]
 
   @@index([userId])
   @@index([wordEntryId])
+  @@index([wordEntryId, voteCount])
 }
 
 model Comment {
@@ -65,9 +72,11 @@ model Comment {
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   storyId   String
-  story     Story     @relation(fields: [storyId], references: [id])
+  // Story를 지우면 달린 댓글도 함께 지운다
+  story     Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
   parentId  String?
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  // 부모 댓글을 지우면 대댓글 스레드 전체를 함께 지운다 (SetNull이면 대댓글이 최상위로 떠버림)
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies   Comment[] @relation("CommentReplies")
   createdAt DateTime  @default(now())
 
@@ -81,7 +90,8 @@ model Vote {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   storyId   String
-  story     Story    @relation(fields: [storyId], references: [id])
+  // Story를 지우면 투표 기록도 함께 지운다
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([userId, storyId])

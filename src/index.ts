@@ -4,6 +4,9 @@ import cors from "cors";
 import session from "express-session";
 import passport from "./lib/passport.js";
 import { authRouter } from "./routes/auth.js";
+import { commentRouter } from "./routes/comments.js";
+import { storyRouter } from "./routes/stories.js";
+import { wordEntryRouter } from "./routes/words.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
@@ -45,11 +48,9 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
-
-// TODO: 기능별 채팅에서 구현하면서 라우터를 여기에 연결
-// app.use("/api/words", wordEntryRouter);
-// app.use("/api/stories", storyRouter);
-// app.use("/api/comments", commentRouter);
+app.use("/api/words", wordEntryRouter);
+app.use("/api/stories", storyRouter);
+app.use("/api/comments", commentRouter);
 
 app.use(errorHandler);
 

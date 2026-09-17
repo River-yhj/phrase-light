@@ -2,16 +2,10 @@ import type { NextFunction, Request, Response } from "express";
 import type { User } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, toPublicUser, verifyPassword, type PublicUser } from "../lib/auth.js";
+import { readString } from "../lib/body.js";
 
 const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** req.body는 신뢰할 수 없으므로 any 없이 좁혀서 읽는다 */
-function readString(body: unknown, key: string): string | null {
-  if (typeof body !== "object" || body === null) return null;
-  const value = (body as Record<string, unknown>)[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
 
 /** 세션을 발급하고(req.login) 사용자 정보를 응답한다 */
 function establishSession(
