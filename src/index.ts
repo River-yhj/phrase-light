@@ -8,6 +8,7 @@ import { commentRouter } from "./routes/comments.js";
 import { storyRouter } from "./routes/stories.js";
 import { wordEntryRouter } from "./routes/words.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
+import { UPLOAD_DIR } from "./lib/storage.js";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -23,6 +24,15 @@ app.use(
   cors({
     origin: process.env.CLIENT_ORIGIN,
     credentials: true,
+  })
+);
+// 업로드 이미지는 세션·passport보다 먼저 서빙한다
+// (뒤에 두면 로그인 사용자의 이미지 요청마다 세션 역직렬화로 DB 조회가 일어난다)
+app.use(
+  "/uploads",
+  express.static(UPLOAD_DIR, {
+    // 확장자로 정해진 Content-Type을 브라우저가 무시하고 내용을 추측(sniff)하지 않도록 한다
+    setHeaders: (res) => res.setHeader("X-Content-Type-Options", "nosniff"),
   })
 );
 app.use(express.json());
