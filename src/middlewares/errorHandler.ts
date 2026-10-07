@@ -18,7 +18,8 @@ export function errorHandler(
     return;
   }
 
-  // 업로드 에러 — multer가 이미 디스크에 쓴 파일(부분 파일 포함)은 정리한 뒤 여기로 넘어온다
+  // 업로드 에러 — 이미지는 메모리에서 시그니처 검사를 통과한 뒤에만 디스크에 쓰므로
+  // 여기로 넘어온 요청에는 정리할 파일이 없다
   if (error instanceof UnsupportedImageTypeError) {
     res.status(400).json({ message: "이미지는 jpeg, png, webp, gif만 업로드할 수 있습니다." });
     return;
