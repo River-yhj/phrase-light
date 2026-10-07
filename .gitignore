@@ -6,3 +6,6 @@ uploads/*
 !uploads/.gitkeep
 *.log
 .DS_Store
+
+# 임시 스키마·테스트 DB 등 작업용 임시 파일 (prisma generate는 여기서만 실행)
+.tmp/
