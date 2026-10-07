@@ -49,6 +49,33 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
 - `User` N:M `Story` — `Vote` 조인 테이블로 업보트 표현 (N:M 요건 충족)
 - `Root` 모델은 아직 스키마에 없음 (위 스코프 결정 참고)
 
+## 사전 API — Wiktionary (2026-10-07 교체)
+
+`WordEntry.meaning`은 외부 사전에서 한 번 채우고 고정한다 (수정 API 없음). 조회 로직은 `src/lib/dictionary.ts` 한 곳에 있다.
+
+- **교체 이유**: 처음 쓰던 dictionaryapi.dev가 2026-09-17부터 3주 넘게 응답하지 않았다.
+  DNS·TCP·TLS 연결은 바로 되는데 API 경로에서만 첫 바이트가 오지 않는 상태(Cloudflare 뒤 원본 서버 무응답)라,
+  그동안 등록한 단어는 전부 `meaning: null`이 됐다. 위키미디어가 운영해 가용성이 높은 Wiktionary로 바꿨다.
+- **엔드포인트**: `https://en.wiktionary.org/api/rest_v1/page/definition/{word}`
+  - 공백은 `_`로 바꾼 뒤 `encodeURIComponent` (`kick the bucket` → `kick_the_bucket`)
+  - 응답의 `en` 배열에서 첫 품사의 첫 정의를 쓴다. 정의에 `<span>`·`<a>` 태그가 섞여 있어 태그를 지우고
+    HTML 엔티티를 풀어 평문으로 저장한다. 태그를 지우면 빈 문자열이 되는 정의는 건너뛴다.
+  - 위키미디어 API 정책에 따라 `User-Agent`에 앱 이름과 연락처를 넣는다
+    (`MuthoRoot/0.1 (https://github.com/River-yhj/mutho-root)`)
+  - 타임아웃 5초, 404·타임아웃·네트워크 오류 등 어떤 실패든 `null`로 폴백 (등록은 막지 않음)
+  - 알아둘 점: "첫 정의"가 비유적 의미가 아니라 문자 그대로의 뜻일 수 있다
+    (예: soapbox → "A crate for packing soap." — 연설대 의미는 두 번째 정의)
+- ⚠️ **출처 표시 필요 (CC BY-SA)**: Wiktionary 본문은 CC BY-SA 라이선스다. 프론트엔드에서 뜻을 보여줄 때
+  "출처: Wiktionary (CC BY-SA)"와 해당 항목 링크를 함께 표시해야 하고, 가져온 뜻 텍스트를 가공해 다시 배포하면
+  같은 라이선스(BY-SA)를 따라야 한다. 4번 프론트엔드 연동 때 반드시 반영할 것.
+- **null 재조회 규칙**: `meaning`이 `null`인 단어는 `GET /api/words/:id` 때 사전을 한 번 더 조회해 채운다.
+  - 이미 값이 있으면 절대 다시 조회하거나 덮어쓰지 않는다 (meaning 고정 원칙)
+  - 저장은 `where: { id, meaning: null }` 조건부 갱신이라, 동시 요청이 먼저 채웠으면 아무것도 바꾸지 않는다
+  - 사전에 없는 단어를 볼 때마다 외부 API를 기다리지 않도록 같은 단어는 10분에 한 번만 재조회한다
+    (서버 메모리 기준이라 재시작하면 초기화됨)
+  - 실제 사례: Wiktionary는 캐시되지 않은 문서의 첫 요청이 5초를 넘길 때가 있다 (soapbox 6.9초 → `null`).
+    이런 단어는 첫 상세 조회 때 채워진다.
+
 ## 다음 작업 순서 (기능 단위로 채팅 분리 예정)
 
 1. 인증 — 회원가입/로그인, Google·Kakao OAuth (Passport + bcrypt)

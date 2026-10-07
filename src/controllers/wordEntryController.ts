@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { IdParams } from "../types/params.js";
 import { getUserId } from "../lib/auth.js";
 import { readTrimmedString } from "../lib/body.js";
-import { fetchMeaning } from "../lib/dictionary.js";
+import { fetchMeaning, retryFetchMeaning } from "../lib/dictionary.js";
 import { authorSelect, isPrismaError, prisma } from "../lib/prisma.js";
 
 const MAX_WORD_LENGTH = 100;
@@ -98,5 +98,24 @@ export async function getWordEntry(req: Request<IdParams>, res: Response): Promi
     res.status(404).json({ message: "단어를 찾을 수 없습니다." });
     return;
   }
+
+  // 등록 당시 사전 조회가 실패해 meaning이 비어 있으면 한 번 더 시도해 채운다.
+  // 이미 값이 있는 단어는 절대 다시 조회하거나 덮어쓰지 않는다 (meaning 고정 원칙).
+  if (word.meaning === null) {
+    const meaning = await retryFetchMeaning(word.word);
+    if (meaning) {
+      // 조건부 갱신: 그사이 다른 요청이 먼저 채웠다면 아무것도 바꾸지 않는다
+      await prisma.wordEntry.updateMany({
+        where: { id: word.id, meaning: null },
+        data: { meaning },
+      });
+      const current = await prisma.wordEntry.findUnique({
+        where: { id: word.id },
+        select: { meaning: true },
+      });
+      word.meaning = current?.meaning ?? null;
+    }
+  }
+
   res.json({ word });
 }
