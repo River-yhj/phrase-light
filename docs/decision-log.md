@@ -168,8 +168,15 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
      독립된 npm 프로젝트로 둔다. 라우팅은 react-router, 스타일은 순수 CSS(`client/src/index.css`).
      - API 호출과 응답 타입은 `client/src/api.ts` 한 파일에 모은다 (fetch 사용).
      - 모든 요청에 `credentials: "include"` — 다음 단계의 세션 로그인 연동 대비.
-     - react-router는 **7.x**를 쓴다. 최신 8.x는 `engines.node >=22.22`인데 개발 PC는 Node 22.16이라,
-       Node 20+를 지원하는 7.18을 골랐다 (이번에 쓰는 `BrowserRouter`·`Routes`·`useParams` 등은 v7·v8 동일).
+     - react-router는 처음엔 7.18을 썼다 (최신 8.x는 `engines.node >=22.22`인데 당시 개발 PC가 Node 22.16).
+       **2026-10-08 Node 24 전환 후 8.4로 올렸다.** v8.0.0 breaking change 중 이 프로젝트에 해당하는 것은 없어서
+       코드 변경 없이 버전만 올렸다:
+       - `react-router-dom` 패키지 제거 → 처음부터 `react-router`에서만 import하고 있었음
+       - ESM 전용 배포 → Vite 번들링이라 무관
+       - `RouterProvider`/`HydratedRouter`는 `react-router/dom`으로 이동 → 선언형 `BrowserRouter`만 써서 무관
+       - middleware·meta `data`·`hasErrorBoundary`·trailing slash 플래그 → Data/Framework 모드 기능이라 무관
+       - 최소 Node 22.22 / React 19.2.7 → Node 24.21, React 19.3.0
+       - 확인: 빌드·lint 통과, 헤드리스 Edge로 홈·검색·상세·없는 단어(404)·없는 경로(`*`) 모두 정상, 콘솔·CORS 에러 0건
    - **Vite 프록시를 쓰지 않는 이유**: 프록시를 쓰면 브라우저 입장에서 같은 출처 요청이 돼서 CORS가 아예 일어나지 않는다.
      실제 배포처럼 프론트(5173)와 백엔드(4000)를 다른 출처로 두고 백엔드의 `cors({ origin: CLIENT_ORIGIN, credentials: true })`가
      실제로 동작하는 모습을 보여주기 위해, `client/.env`의 `VITE_API_URL`(http://localhost:4000)로 직접 요청한다.
@@ -184,6 +191,13 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
    - 확인 방법 메모: CORS는 브라우저만 강제하므로 curl로는 "에러 없음"을 증명할 수 없다. 개발 PC의 Edge를
      헤드리스(임시 프로필)로 띄워 실제 렌더링·콘솔 로그로 확인했다 (`--dump-dom`은 끝나지 않는 요청을 무한정 기다리므로
      로딩 화면은 `--timeout`으로 캡처).
+
+## 개발 환경
+
+- **Node.js 24 기준** (2026-10-08 전환). 루트 `package.json`의 `engines`는 `>=24`이고 README도 24 기준으로 안내한다.
+  - 그전까지 개발 PC는 Node 22.16이었다. 백엔드는 문제없이 돌았지만 `engines`(>=24)와 어긋나 있었고,
+    react-router 8(Node 22.22 이상)을 쓸 수 없어서 7.x로 버텼다. PC를 24.21로 올린 뒤 8.x로 업그레이드했다.
+  - Vite 8 자체는 Node 20.19+ / 22.12+면 되지만, 프로젝트 기준은 `engines`와 맞춰 24로 통일한다.
 
 ## 저장소
 
