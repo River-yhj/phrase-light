@@ -78,8 +78,46 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
 
 ## 다음 작업 순서 (기능 단위로 채팅 분리 예정)
 
-1. 인증 — 회원가입/로그인, Google·Kakao OAuth (Passport + bcrypt)
-2. Story·Comment API + 소유권 기반 권한 (본인 글만 수정·삭제)
+1. 인증 — 회원가입/로그인, Google·Kakao OAuth (Passport + bcrypt) — **완료 (2026-09-15)**
+   - 로컬 이메일+비밀번호 가입/로그인(bcrypt) + Google/Kakao OAuth 전부 실제 브라우저 테스트 통과
+   - **카카오는 이메일을 안 줌**: 개인 개발자는 "카카오계정(이메일)" 동의항목을 바로 못 쓴다
+     (비즈 앱 전환 + 별도 심사 필요, 시간 소요). 그래서 이메일에 의존하지 않는 쪽으로 설계 변경:
+     - `User.email`을 `String? @unique`(선택값)로 변경
+     - `@@unique([provider, providerId])`를 추가해서, 소셜 로그인 사용자는 이메일이 아니라 이 조합으로 식별
+     - 카카오 로그인 시 `email: null`, `name`엔 카카오 닉네임 저장
+   - 동의항목: 닉네임은 **필수 동의**(서비스 운영에 꼭 필요), 프로필 사진은 **선택 동의**로 신청
+   - `SESSION_SECRET`이 빈 문자열이면 `?? "dev-secret"` 폴백이 안 먹혀서 (`??`는 null/undefined만 처리)
+     서버 전체가 500 — 반드시 실제 랜덤 값을 채워야 함. 운영 환경(`NODE_ENV=production`)에서는
+     기본값으로 기동 자체가 막히도록 처리해둠
+   - 트러블슈팅 기록 (다음에 또 겪을 수 있으니):
+     - 카카오 KOE006(Redirect URI 불일치) — `.env`의 `KAKAO_CALLBACK_URL`과 카카오 콘솔 등록값이
+       정확히 일치해야 함 (슬래시 하나 차이도 실패 원인)
+     - Supabase Transaction pooler(6543)만 인증 실패하고 Session pooler(5432, `DIRECT_URL`)는 되는 경우:
+       - DB 비밀번호를 새로 설정/리셋한 직후라면 Supabase 공식 문서에 나온 알려진 캐시 지연 현상 —
+         몇 분 기다렸다가 재시도하면 보통 해결됨
+       - 그래도 안 되면 `DATABASE_URL`과 `DIRECT_URL`의 비밀번호가 같은지 먼저 비교할 것
+         (2026-09-15에 실제로 겪은 원인은 두 URL의 비밀번호 불일치였음)
+       - 이 프로젝트 규모(서버리스 아닌 단일 Express 서버)에서는 `DATABASE_URL`도 그냥
+         `DIRECT_URL`과 같은 세션 풀러 문자열을 써도 무방함
+     - Supabase 무료 플랜은 7일간 활동이 없으면 프로젝트가 일시 중지된다. 이때 두 연결 모두
+       `FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found`가 난다 — 대시보드에서 Restore
+       (2026-10-07에 실제로 겪음)
+2. Story·Comment API + 소유권 기반 권한 (본인 글만 수정·삭제) — **완료 (2026-09-17)**
+   - **WordEntry는 "단어 검색 사이트"의 핵심**: `meaning`은 커뮤니티가 채우는 게 아니라 외부 사전 API에서
+     조회해서 **고정 저장**한다. 등록 후에는 아무도 수정할 수 없음 (수정 API 자체를 만들지 않음).
+     처음엔 dictionaryapi.dev를 썼다가 Wiktionary로 교체 (위 "사전 API" 섹션 참고)
+   - **muthos/logos 구도가 여기서 완성됨**: `meaning`(고정된, 검증된 뜻) = logos,
+     `Story`(검증 안 됐지만 재밌는 이야기, 인기로 줄세워짐) = muthos.
+   - **단어 등록은 find-or-create**: 이미 같은 단어(`WordEntry.word`, 소문자 정규화)가 있으면 기존 항목을
+     재사용하고, 없으면 사전 API를 조회해 `meaning`을 채운 뒤 새로 생성한다 (`word`에 `@unique`).
+   - 사전 API에서 뜻을 못 찾아도(404 등) 등록 자체는 막지 않는다 — `meaning: null`로 생성하고
+     프론트에서 "사전에 없는 표현" 정도로 표시.
+   - **Story 정렬**: 한 단어의 story 목록은 추천수(`voteCount`) 내림차순으로 보여준다.
+   - 성능을 위해 Vote 개수를 매번 집계(count)하지 않고 `Story.voteCount` 컬럼에 미리 계산해 들고 있는다 —
+     투표/취소 시 Prisma 트랜잭션으로 `Vote` row 생성·삭제와 `voteCount` +1/-1을 함께 처리한다
+     (`@@index([wordEntryId, voteCount])`). 같은 사용자의 동시 투표가 겹치면 한쪽을 롤백하고 409로 응답한다.
+   - Story를 지우면 댓글·투표를, 부모 댓글을 지우면 대댓글 스레드 전체를 함께 지운다 (`onDelete: Cascade`).
+     기본값(RESTRICT)이면 투표·댓글이 달린 story는 삭제가 실패하고, SetNull이면 대댓글이 최상위로 떠버린다.
 3. 이미지 업로드 (multer, Story에 첨부) — **완료 (2026-10-07)**
    - multer 2.x로 로컬 디스크 `uploads/`에 저장, Story당 1장 (기존 `Story.imageUrl` 사용, 스키마 변경 없음)
    - 파일명은 원본 이름 대신 `crypto.randomUUID()` + 확장자. 확장자는 원본 파일명도, 클라이언트가 보낸
