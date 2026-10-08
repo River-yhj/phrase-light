@@ -135,6 +135,9 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
      - Reddit·Instagram 같은 대형 SNS와 같은 방식이다.
      - 사용자당 story 1표 제한(`Vote`의 `@@unique([userId, storyId])` + 토글)은 그대로 유지한다.
      - ⚠️ 이후 작업에서 이 동작을 버그로 보고 막지 않는다.
+   - **`votedByMe` (2026-10-08 추가)**: `GET /api/words/:id`의 각 story에 로그인 사용자가 추천했는지(boolean)를 넣는다.
+     비로그인이면 전부 `false`. 추천 버튼의 눌림 상태 표시용이며, story 수만큼 쿼리하지 않도록
+     그 단어의 story ID 목록으로 내 Vote를 한 번에 조회한다.
    - Story를 지우면 댓글·투표를, 부모 댓글을 지우면 대댓글 스레드 전체를 함께 지운다 (`onDelete: Cascade`).
      기본값(RESTRICT)이면 투표·댓글이 달린 story는 삭제가 실패하고, SetNull이면 대댓글이 최상위로 떠버린다.
    - **content 입력 검증 (2026-10-08 추가)** — story·comment 공통, `src/lib/body.ts`의 `readContent` 한 곳에서:

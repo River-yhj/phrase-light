@@ -90,5 +90,20 @@ export async function getWordEntry(req: Request<IdParams>, res: Response): Promi
     }
   }
 
-  res.json({ word });
+  // 로그인 사용자가 각 story에 추천했는지 (비로그인이면 전부 false) — 추천 버튼의 눌림 상태 표시용.
+  // story 수만큼 쿼리하지 않도록 이 단어의 story들에 대한 내 투표를 한 번에 가져온다.
+  const myVotes = req.isAuthenticated()
+    ? await prisma.vote.findMany({
+        where: { userId: req.user.id, storyId: { in: word.stories.map((story) => story.id) } },
+        select: { storyId: true },
+      })
+    : [];
+  const votedStoryIds = new Set(myVotes.map((vote) => vote.storyId));
+
+  res.json({
+    word: {
+      ...word,
+      stories: word.stories.map((story) => ({ ...story, votedByMe: votedStoryIds.has(story.id) })),
+    },
+  });
 }
