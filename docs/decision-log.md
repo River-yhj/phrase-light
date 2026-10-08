@@ -51,26 +51,37 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
 
 ## 사전 API — Wiktionary (2026-10-07 교체)
 
-`WordEntry.meaning`은 외부 사전에서 한 번 채우고 고정한다 (수정 API 없음). 조회 로직은 `src/lib/dictionary.ts` 한 곳에 있다.
+`WordEntry.definitions`는 외부 사전에서 한 번 채우고 고정한다 (수정 API 없음). 조회 로직은 `src/lib/dictionary.ts` 한 곳에 있다.
 
 - **교체 이유**: 처음 쓰던 dictionaryapi.dev가 2026-09-17부터 3주 넘게 응답하지 않았다.
   DNS·TCP·TLS 연결은 바로 되는데 API 경로에서만 첫 바이트가 오지 않는 상태(Cloudflare 뒤 원본 서버 무응답)라,
   그동안 등록한 단어는 전부 `meaning: null`이 됐다. 위키미디어가 운영해 가용성이 높은 Wiktionary로 바꿨다.
 - **엔드포인트**: `https://en.wiktionary.org/api/rest_v1/page/definition/{word}`
   - 공백은 `_`로 바꾼 뒤 `encodeURIComponent` (`kick the bucket` → `kick_the_bucket`)
-  - 응답의 `en` 배열에서 첫 품사의 첫 정의를 쓴다. 정의에 `<span>`·`<a>` 태그가 섞여 있어 태그를 지우고
-    HTML 엔티티를 풀어 평문으로 저장한다. 태그를 지우면 빈 문자열이 되는 정의는 건너뛴다.
+  - 응답의 `en` 배열에서 정의를 **품사를 가리지 않고 사전 순서대로 최대 5개** 저장한다 (아래 2026-10-08 변경 참고).
+    정의에 `<span>`·`<a>` 태그가 섞여 있어 태그를 지우고 HTML 엔티티를 풀어 평문으로 저장한다.
+    태그를 지우면 빈 문자열이 되는 정의는 건너뛰고 5개에도 세지 않는다.
   - 위키미디어 API 정책에 따라 `User-Agent`에 앱 이름과 연락처를 넣는다
     (`MuthoRoot/0.1 (https://github.com/River-yhj/mutho-root)`)
   - 타임아웃 5초, 404·타임아웃·네트워크 오류 등 어떤 실패든 `null`로 폴백 (등록은 막지 않음)
-  - 알아둘 점: "첫 정의"가 비유적 의미가 아니라 문자 그대로의 뜻일 수 있다
-    (예: soapbox → "A crate for packing soap." — 연설대 의미는 두 번째 정의)
+- **2026-10-08 변경 — `meaning`(String?) → `definitions`(Json?)**:
+  - 문제: "첫 품사의 첫 정의" 하나만 저장하니 soapbox가 "A crate for packing soap."만 남고,
+    이 사이트의 핵심인 비유적 의미(연설대, 의견을 늘어놓는 장)가 빠졌다.
+  - 형식: `[{ "partOfSpeech": "noun", "text": "..." }, ...]` — 품사는 소문자, Wiktionary `en` 배열 순서 유지, 최대 5개.
+    이제 soapbox는 1 비누 상자 / 2 즉석 연설대 / 3 의견을 밝히는 매체 / 4 비유적 의미 / 5 그 주제 까지 저장된다.
+  - 알려진 트레이드오프: 품사를 가리지 않고 앞에서 5개라, 한 품사의 정의가 5개 이상이면 뒤 품사는 빠진다
+    (예: hello는 감탄사 5개만 들어가고 명사·동사 뜻은 빠짐). 필요하면 "품사별 최대 N개"로 바꿀 것.
+  - API 응답 필드도 `definitions`. 검색(`GET /api/words?q=`)은 여전히 `word` 기준이다 (뜻 텍스트로는 검색 안 됨).
+  - 단어가 0건인 것을 확인한 뒤 `meaning` 컬럼을 지우고 `definitions JSONB`를 추가했다 (데이터 이전 없음).
+  - 구현 메모: Prisma `Json?` 필드는 일반 `null`로 쓰거나 필터할 수 없어서 `Prisma.DbNull`(DB의 NULL)을 쓴다.
+    "못 가져옴"은 항상 DB NULL이고, JSON `null`이나 빈 배열은 저장하지 않는다.
 - ⚠️ **출처 표시 필요 (CC BY-SA)**: Wiktionary 본문은 CC BY-SA 라이선스다. 프론트엔드에서 뜻을 보여줄 때
   "출처: Wiktionary (CC BY-SA)"와 해당 항목 링크를 함께 표시해야 하고, 가져온 뜻 텍스트를 가공해 다시 배포하면
   같은 라이선스(BY-SA)를 따라야 한다. 4번 프론트엔드 연동 때 반드시 반영할 것.
-- **null 재조회 규칙**: `meaning`이 `null`인 단어는 `GET /api/words/:id` 때 사전을 한 번 더 조회해 채운다.
-  - 이미 값이 있으면 절대 다시 조회하거나 덮어쓰지 않는다 (meaning 고정 원칙)
-  - 저장은 `where: { id, meaning: null }` 조건부 갱신이라, 동시 요청이 먼저 채웠으면 아무것도 바꾸지 않는다
+- **null 재조회 규칙**: `definitions`가 `null`인 단어는 `GET /api/words/:id` 때 사전을 한 번 더 조회해 채운다.
+  - 이미 값이 있으면 절대 다시 조회하거나 덮어쓰지 않는다 (고정 원칙은 definitions 전체에 적용)
+  - 저장은 `where: { id, definitions: { equals: Prisma.DbNull } }` 조건부 갱신이라, 동시 요청이 먼저 채웠으면
+    아무것도 바꾸지 않는다
   - 사전에 없는 단어를 볼 때마다 외부 API를 기다리지 않도록 같은 단어는 10분에 한 번만 재조회한다
     (서버 메모리 기준이라 재시작하면 초기화됨)
   - 실제 사례: Wiktionary는 캐시되지 않은 문서의 첫 요청이 5초를 넘길 때가 있다 (soapbox 6.9초 → `null`).
@@ -103,14 +114,15 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
        `FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found`가 난다 — 대시보드에서 Restore
        (2026-10-07에 실제로 겪음)
 2. Story·Comment API + 소유권 기반 권한 (본인 글만 수정·삭제) — **완료 (2026-09-17)**
-   - **WordEntry는 "단어 검색 사이트"의 핵심**: `meaning`은 커뮤니티가 채우는 게 아니라 외부 사전 API에서
+   - **WordEntry는 "단어 검색 사이트"의 핵심**: 뜻은 커뮤니티가 채우는 게 아니라 외부 사전 API에서
      조회해서 **고정 저장**한다. 등록 후에는 아무도 수정할 수 없음 (수정 API 자체를 만들지 않음).
-     처음엔 dictionaryapi.dev를 썼다가 Wiktionary로 교체 (위 "사전 API" 섹션 참고)
-   - **muthos/logos 구도가 여기서 완성됨**: `meaning`(고정된, 검증된 뜻) = logos,
+     처음엔 dictionaryapi.dev + `meaning` 한 줄이었다가 Wiktionary + `definitions` 목록으로 바뀜
+     (위 "사전 API" 섹션 참고)
+   - **muthos/logos 구도가 여기서 완성됨**: `definitions`(고정된, 검증된 뜻) = logos,
      `Story`(검증 안 됐지만 재밌는 이야기, 인기로 줄세워짐) = muthos.
    - **단어 등록은 find-or-create**: 이미 같은 단어(`WordEntry.word`, 소문자 정규화)가 있으면 기존 항목을
-     재사용하고, 없으면 사전 API를 조회해 `meaning`을 채운 뒤 새로 생성한다 (`word`에 `@unique`).
-   - 사전 API에서 뜻을 못 찾아도(404 등) 등록 자체는 막지 않는다 — `meaning: null`로 생성하고
+     재사용하고, 없으면 사전 API를 조회해 `definitions`를 채운 뒤 새로 생성한다 (`word`에 `@unique`).
+   - 사전 API에서 뜻을 못 찾아도(404 등) 등록 자체는 막지 않는다 — `definitions: null`로 생성하고
      프론트에서 "사전에 없는 표현" 정도로 표시.
    - **Story 정렬**: 한 단어의 story 목록은 추천수(`voteCount`) 내림차순으로 보여준다.
    - 성능을 위해 Vote 개수를 매번 집계(count)하지 않고 `Story.voteCount` 컬럼에 미리 계산해 들고 있는다 —

@@ -1,8 +1,9 @@
+import { Prisma } from "@prisma/client";
 import type { Request, Response } from "express";
 import type { IdParams } from "../types/params.js";
 import { getUserId } from "../lib/auth.js";
 import { readTrimmedString } from "../lib/body.js";
-import { fetchMeaning, retryFetchMeaning } from "../lib/dictionary.js";
+import { fetchDefinitions, retryFetchDefinitions } from "../lib/dictionary.js";
 import { authorSelect, isPrismaError, prisma } from "../lib/prisma.js";
 
 const MAX_WORD_LENGTH = 100;
@@ -16,7 +17,7 @@ function normalizeWord(raw: string): string {
 /**
  * POST /api/words — find-or-create
  * 같은 단어가 이미 있으면 그대로 200으로 돌려주고, 없으면 사전에서 뜻을 채워 201로 생성한다.
- * meaning은 생성 시점에만 채우는 고정값이라 수정 API를 두지 않는다.
+ * definitions는 생성 시점에만 채우는 고정값이라 수정 API를 두지 않는다.
  */
 export async function createWordEntry(req: Request, res: Response): Promise<void> {
   const raw = readTrimmedString(req.body, "word");
@@ -37,11 +38,12 @@ export async function createWordEntry(req: Request, res: Response): Promise<void
   }
 
   // 사전 조회가 404·타임아웃 등으로 실패해도 null로 받고 등록은 계속한다
-  const meaning = await fetchMeaning(word);
+  const definitions = await fetchDefinitions(word);
 
   try {
     const created = await prisma.wordEntry.create({
-      data: { word, meaning, userId: getUserId(req) },
+      // Json 컬럼에 DB NULL을 넣으려면 null 대신 Prisma.DbNull을 써야 한다
+      data: { word, definitions: definitions ?? Prisma.DbNull, userId: getUserId(req) },
     });
     res.status(201).json({ word: created, created: true });
   } catch (error) {
@@ -68,7 +70,7 @@ export async function searchWordEntries(req: Request, res: Response): Promise<vo
     select: {
       id: true,
       word: true,
-      meaning: true,
+      definitions: true,
       createdAt: true,
       _count: { select: { stories: true } },
     },
@@ -99,21 +101,21 @@ export async function getWordEntry(req: Request<IdParams>, res: Response): Promi
     return;
   }
 
-  // 등록 당시 사전 조회가 실패해 meaning이 비어 있으면 한 번 더 시도해 채운다.
-  // 이미 값이 있는 단어는 절대 다시 조회하거나 덮어쓰지 않는다 (meaning 고정 원칙).
-  if (word.meaning === null) {
-    const meaning = await retryFetchMeaning(word.word);
-    if (meaning) {
+  // 등록 당시 사전 조회가 실패해 definitions가 비어 있으면 한 번 더 시도해 채운다.
+  // 이미 값이 있는 단어는 절대 다시 조회하거나 덮어쓰지 않는다 (definitions 고정 원칙).
+  if (word.definitions === null) {
+    const definitions = await retryFetchDefinitions(word.word);
+    if (definitions) {
       // 조건부 갱신: 그사이 다른 요청이 먼저 채웠다면 아무것도 바꾸지 않는다
       await prisma.wordEntry.updateMany({
-        where: { id: word.id, meaning: null },
-        data: { meaning },
+        where: { id: word.id, definitions: { equals: Prisma.DbNull } },
+        data: { definitions },
       });
       const current = await prisma.wordEntry.findUnique({
         where: { id: word.id },
-        select: { meaning: true },
+        select: { definitions: true },
       });
-      word.meaning = current?.meaning ?? null;
+      word.definitions = current?.definitions ?? null;
     }
   }
 
