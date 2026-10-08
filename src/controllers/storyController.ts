@@ -2,12 +2,11 @@ import type { Prisma } from "@prisma/client";
 import type { Request, Response } from "express";
 import type { IdParams } from "../types/params.js";
 import { getUserId } from "../lib/auth.js";
-import { readTrimmedString } from "../lib/body.js";
+import { readContent } from "../lib/body.js";
 import { authorSelect, prisma } from "../lib/prisma.js";
 import { deleteImage, getUploadedImageUrl } from "../lib/storage.js";
 
 const MAX_STORY_LENGTH = 10_000;
-const CONTENT_TOO_LONG = `content는 ${MAX_STORY_LENGTH}자 이하여야 합니다.`;
 
 /** multipart에서는 문자열 "true", JSON에서는 boolean true로 올 수 있다 */
 function readRemoveImage(body: unknown): boolean {
@@ -25,15 +24,12 @@ export async function createStory(req: Request<IdParams>, res: Response): Promis
   let saved = false;
 
   try {
-    const content = readTrimmedString(req.body, "content");
-    if (!content) {
-      res.status(400).json({ message: "content가 필요합니다." });
+    const parsed = readContent(req.body, { maxLength: MAX_STORY_LENGTH, required: true });
+    if (!parsed.ok) {
+      res.status(400).json({ message: parsed.message });
       return;
     }
-    if (content.length > MAX_STORY_LENGTH) {
-      res.status(400).json({ message: CONTENT_TOO_LONG });
-      return;
-    }
+    const content = parsed.content;
 
     const wordEntry = await prisma.wordEntry.findUnique({
       where: { id: req.params.id },
@@ -67,13 +63,13 @@ export async function updateStory(req: Request<IdParams>, res: Response): Promis
   let saved = false;
 
   try {
-    const content = readTrimmedString(req.body, "content");
-    const removeImage = readRemoveImage(req.body);
-
-    if (content && content.length > MAX_STORY_LENGTH) {
-      res.status(400).json({ message: CONTENT_TOO_LONG });
+    const parsed = readContent(req.body, { maxLength: MAX_STORY_LENGTH, required: false });
+    if (!parsed.ok) {
+      res.status(400).json({ message: parsed.message });
       return;
     }
+    const content = parsed.content;
+    const removeImage = readRemoveImage(req.body);
     if (newImageUrl && removeImage) {
       res.status(400).json({ message: "image와 removeImage=true를 함께 보낼 수 없습니다." });
       return;

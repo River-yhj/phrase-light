@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { Request, Response } from "express";
 import type { IdParams } from "../types/params.js";
 import { getUserId } from "../lib/auth.js";
-import { readTrimmedString } from "../lib/body.js";
+import { readContent, readTrimmedString } from "../lib/body.js";
 import { authorSelect, prisma } from "../lib/prisma.js";
 
 const MAX_COMMENT_LENGTH = 2_000;
@@ -29,17 +29,14 @@ function buildThread(comments: CommentWithAuthor[]): CommentNode[] {
   return roots;
 }
 
-function readContent(body: unknown, res: Response): string | null {
-  const content = readTrimmedString(body, "content");
-  if (!content) {
-    res.status(400).json({ message: "content가 필요합니다." });
+/** 공용 규칙(lib/body.ts readContent)으로 검증하고, 실패하면 400을 보내고 null을 돌려준다 */
+function readCommentContent(body: unknown, res: Response): string | null {
+  const parsed = readContent(body, { maxLength: MAX_COMMENT_LENGTH, required: true });
+  if (!parsed.ok) {
+    res.status(400).json({ message: parsed.message });
     return null;
   }
-  if (content.length > MAX_COMMENT_LENGTH) {
-    res.status(400).json({ message: `content는 ${MAX_COMMENT_LENGTH}자 이하여야 합니다.` });
-    return null;
-  }
-  return content;
+  return parsed.content;
 }
 
 /** GET /api/stories/:id/comments — 스레드(트리) 구조로 반환 */
@@ -61,7 +58,7 @@ export async function listComments(req: Request<IdParams>, res: Response): Promi
 
 /** POST /api/stories/:id/comments — body.parentId가 있으면 대댓글 */
 export async function createComment(req: Request<IdParams>, res: Response): Promise<void> {
-  const content = readContent(req.body, res);
+  const content = readCommentContent(req.body, res);
   if (content === null) return;
 
   const storyId = req.params.id;
@@ -93,7 +90,7 @@ export async function createComment(req: Request<IdParams>, res: Response): Prom
 
 /** PATCH /api/comments/:id — requireCommentOwner 통과 후 호출된다 */
 export async function updateComment(req: Request<IdParams>, res: Response): Promise<void> {
-  const content = readContent(req.body, res);
+  const content = readCommentContent(req.body, res);
   if (content === null) return;
 
   const comment = await prisma.comment.update({
