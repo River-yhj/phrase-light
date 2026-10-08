@@ -164,7 +164,27 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
      재배포·재시작·스케일 아웃 때 `uploads/`가 초기화되고, DB의 `imageUrl`만 남아 이미지가 전부 404가 된다.
      인스턴스가 여러 대면 업로드된 인스턴스에만 파일이 있다. 배포 전에 Supabase Storage 같은
      외부 오브젝트 스토리지로 옮겨야 한다 (`src/lib/storage.ts`만 교체하면 되도록 설계해 둠).
-4. 프론트엔드 연동 (fetch/axios, cors)
+4. 프론트엔드 연동 (fetch, cors) — **조회 화면 완료 (2026-10-08)**, 로그인·작성 화면은 다음 단계
+   - **구조**: 저장소 루트의 `client/`에 Vite + React + TypeScript(react-ts 템플릿). 백엔드 구조는 그대로 두고
+     독립된 npm 프로젝트로 둔다. 라우팅은 react-router, 스타일은 순수 CSS(`client/src/index.css`).
+     - API 호출과 응답 타입은 `client/src/api.ts` 한 파일에 모은다 (fetch 사용).
+     - 모든 요청에 `credentials: "include"` — 다음 단계의 세션 로그인 연동 대비.
+     - react-router는 **7.x**를 쓴다. 최신 8.x는 `engines.node >=22.22`인데 개발 PC는 Node 22.16이라,
+       Node 20+를 지원하는 7.18을 골랐다 (이번에 쓰는 `BrowserRouter`·`Routes`·`useParams` 등은 v7·v8 동일).
+   - **Vite 프록시를 쓰지 않는 이유**: 프록시를 쓰면 브라우저 입장에서 같은 출처 요청이 돼서 CORS가 아예 일어나지 않는다.
+     실제 배포처럼 프론트(5173)와 백엔드(4000)를 다른 출처로 두고 백엔드의 `cors({ origin: CLIENT_ORIGIN, credentials: true })`가
+     실제로 동작하는 모습을 보여주기 위해, `client/.env`의 `VITE_API_URL`(http://localhost:4000)로 직접 요청한다.
+     - 대가: 프론트 포트가 `CLIENT_ORIGIN`과 정확히 같아야 한다. 그래서 Vite를 `port: 5173, strictPort: true`로 고정했다
+       (5173이 사용 중일 때 5174로 조용히 넘어가면 CORS로 전부 막히므로, 넘어가지 않고 바로 실패하게 함).
+     - `credentials: "include"`와 함께 쓰려면 `Access-Control-Allow-Origin`이 `*`가 아니라 정확한 출처여야 하고
+       `Access-Control-Allow-Credentials: true`가 필요하다 — 둘 다 응답 헤더로 확인함.
+   - **화면**: 홈(`/`) 단어 검색(검색어는 URL `?q=`에 담아 뒤로 가기 시 유지, 검색어가 없으면 최근 단어),
+     단어 상세(`/words/:id`) 뜻을 품사별 번호 목록으로 + Wiktionary 출처·CC BY-SA 링크 + story 목록(추천순, 썸네일).
+     `definitions`가 null이면 "사전에서 찾을 수 없는 표현입니다". 모든 페이지 하단에 설(說) 디스클레이머.
+     로딩·에러(네트워크·404)·결과 없음 상태를 각각 처리한다.
+   - 확인 방법 메모: CORS는 브라우저만 강제하므로 curl로는 "에러 없음"을 증명할 수 없다. 개발 PC의 Edge를
+     헤드리스(임시 프로필)로 띄워 실제 렌더링·콘솔 로그로 확인했다 (`--dump-dom`은 끝나지 않는 요청을 무한정 기다리므로
+     로딩 화면은 `--timeout`으로 캡처).
 
 ## 저장소
 
