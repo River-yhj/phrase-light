@@ -60,7 +60,8 @@ h2,
 
 .site-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 24px 0 16px;
   border-bottom: 1px solid var(--line);
@@ -370,4 +371,150 @@ h2,
   margin: 2px 0 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* ---------- 공통 버튼 ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.button--small {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+.button--ghost {
+  color: var(--accent);
+  background: transparent;
+}
+
+/* ---------- 헤더: 로그인 상태 ---------- */
+
+.auth-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  margin-left: auto;
+}
+
+.auth-nav__name {
+  font-weight: 600;
+}
+
+/* ---------- 로그인 페이지 ---------- */
+
+.auth-page h1 {
+  margin: 0 0 20px;
+}
+
+.auth-forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.auth-form h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.auth-form label {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.auth-form input {
+  padding: 10px 12px;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.auth-form input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.auth-form .button {
+  margin-top: 12px;
+}
+
+.form-error {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  color: var(--danger);
+  background: #fdf1ef;
+  border: 1px solid #efc9c2;
+  border-radius: 8px;
+}
+
+.oauth {
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+  margin: 28px auto 0;
+  text-align: center;
+}
+
+.oauth__divider {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.oauth__button {
+  padding: 11px 16px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.oauth__button--google {
+  color: #1f1f1f;
+  background: #fff;
+  border: 1px solid #dadce0;
+}
+
+/* 카카오 로그인 버튼 가이드의 노란 배경 */
+.oauth__button--kakao {
+  color: rgb(0 0 0 / 0.85);
+  background: #fee500;
+  border: 1px solid #fee500;
+}
+
+.oauth__note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
 }

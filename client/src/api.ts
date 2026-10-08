@@ -69,6 +69,16 @@ export type WordDetail = {
   stories: Story[]
 }
 
+/** 로그인한 본인 정보 (GET /api/auth/me, 로그인·가입 응답). 비밀번호 해시는 백엔드가 빼고 준다 */
+export type AuthUser = {
+  id: string
+  email: string | null
+  name: string | null
+  provider: string | null
+  providerId: string | null
+  createdAt: string
+}
+
 // ---------- 공통 요청 함수 ----------
 
 /** HTTP 에러(4xx·5xx)와 네트워크 에러를 구분할 수 있게 status를 함께 담는다 (네트워크 에러는 0) */
@@ -93,8 +103,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
-      // 세션 쿠키를 주고받기 위해 모든 요청에 포함한다 (다음 단계의 로그인 연동 대비).
+      // 세션 쿠키(connect.sid)를 주고받기 위해 모든 요청에 포함한다.
       // 백엔드 CORS가 credentials: true + 정확한 origin을 설정해 둬서 이 조합이 허용된다.
+      // localhost:5173과 localhost:4000은 포트만 다른 같은 사이트라 SameSite=Lax 쿠키도 실린다.
       credentials: 'include',
       headers: { Accept: 'application/json', ...init.headers },
     })
@@ -112,7 +123,48 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
-// ---------- 엔드포인트 ----------
+/** JSON 본문을 보내는 POST 요청 옵션 */
+function postJson(body: unknown): RequestInit {
+  return { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }
+}
+
+// ---------- 엔드포인트: 인증 ----------
+
+/** 현재 로그인한 사용자. 로그인하지 않았으면(401) 에러가 아니라 null */
+export async function getMe(signal?: AbortSignal): Promise<AuthUser | null> {
+  try {
+    const data = await request<{ user: AuthUser }>('/api/auth/me', { signal })
+    return data.user
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null
+    throw error
+  }
+}
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const data = await request<{ user: AuthUser }>('/api/auth/login', postJson({ email, password }))
+  return data.user
+}
+
+/** 가입과 동시에 세션이 발급된다 (백엔드가 가입 직후 로그인 처리) */
+export async function register(email: string, password: string, name: string): Promise<AuthUser> {
+  const data = await request<{ user: AuthUser }>('/api/auth/register', postJson({ email, password, name: name || undefined }))
+  return data.user
+}
+
+export async function logout(): Promise<void> {
+  await request<{ ok: true }>('/api/auth/logout', { method: 'POST' })
+}
+
+export type OAuthProvider = 'google' | 'kakao'
+
+/** 소셜 로그인은 fetch가 아니라 페이지 이동이다 — 백엔드가 제공자 로그인 화면으로 보내고,
+ * 끝나면 OAUTH_SUCCESS_REDIRECT(프론트 주소)로 돌려보낸다 */
+export function oauthLoginUrl(provider: OAuthProvider): string {
+  return `${API_URL}/api/auth/${provider}`
+}
+
+// ---------- 엔드포인트: 단어·story ----------
 
 /** 단어 검색. q가 비어 있으면 최근 등록된 단어를 돌려준다 (최대 20개) */
 export async function searchWords(q: string, signal?: AbortSignal): Promise<WordSummary[]> {
