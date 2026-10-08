@@ -1,6 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { searchWords } from '../api'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { ApiError, createWord, searchWords } from '../api'
+import { loginPath, useAuth } from '../auth/authContext'
 import { Empty, ErrorMessage, Loading } from '../components/Status'
 import { useAsync } from '../useAsync'
 
@@ -26,7 +27,11 @@ export default function HomePage() {
       {state.status === 'error' && <ErrorMessage error={state.error} />}
       {state.status === 'success' &&
         (state.data.length === 0 ? (
-          <Empty>{q ? `'${q}'에 대한 검색 결과가 없습니다.` : '아직 등록된 단어가 없습니다.'}</Empty>
+          <>
+            <Empty>{q ? `'${q}'에 대한 검색 결과가 없습니다.` : '아직 등록된 단어가 없습니다.'}</Empty>
+            {/* key={q}: 검색어가 바뀌면 등록 진행·에러 상태를 새로 시작한다 */}
+            {q && <RegisterWord key={q} word={q} />}
+          </>
         ) : (
           <ul className="word-list">
             {state.data.map((word) => (
@@ -69,5 +74,59 @@ function SearchForm({ initial, onSearch }: { initial: string; onSearch: (q: stri
       />
       <button type="submit">검색</button>
     </form>
+  )
+}
+
+/**
+ * 검색 결과가 없을 때 그 검색어를 단어로 등록한다.
+ * - 비로그인이면 로그인 페이지로 보내고, 로그인 후 이 검색 결과로 돌아온다.
+ * - 등록은 find-or-create라, 그사이 누가 먼저 등록했으면(created: false) 그 단어로 간다 — 어느 쪽이든 상세로 이동.
+ * - 새 단어면 백엔드가 사전에서 뜻을 가져오느라 몇 초 걸릴 수 있어 진행 중 표시를 한다.
+ */
+function RegisterWord({ word }: { word: string }) {
+  const { status, user, setUser } = useAuth()
+  const navigate = useNavigate()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const backToSearch = `/?q=${encodeURIComponent(word)}`
+
+  async function handleClick() {
+    if (!user) {
+      navigate(loginPath(backToSearch))
+      return
+    }
+    setPending(true)
+    setError(null)
+    try {
+      const { word: entry } = await createWord(word)
+      navigate(`/words/${entry.id}`)
+    } catch (caught) {
+      // 세션이 만료됐으면 로그인 상태를 비우고 다시 로그인하게 한다
+      if (caught instanceof ApiError && caught.status === 401) {
+        setUser(null)
+        navigate(loginPath(backToSearch))
+        return
+      }
+      setError(caught instanceof ApiError ? caught.message : '등록하지 못했습니다. 다시 시도해 주세요.')
+      setPending(false)
+    }
+  }
+
+  if (pending) {
+    return <Loading label={`'${word}' 등록 중… 사전에서 뜻을 찾고 있어요 (몇 초 걸릴 수 있어요)`} />
+  }
+
+  return (
+    <div className="register-word">
+      <button type="button" className="button" onClick={handleClick} disabled={status === 'checking'}>
+        '{word}' 등록하기
+      </button>
+      {!user && status === 'ready' && <p className="register-word__hint">로그인하면 새 단어를 등록할 수 있어요.</p>}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }

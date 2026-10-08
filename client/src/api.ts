@@ -79,6 +79,15 @@ export type AuthUser = {
   createdAt: string
 }
 
+/** POST /api/words 응답의 단어 — find-or-create라 created로 새로 만들었는지 알려준다 */
+export type CreatedWord = {
+  id: string
+  word: string
+  definitions: Definition[] | null
+  createdAt: string
+  userId: string
+}
+
 // ---------- 공통 요청 함수 ----------
 
 /** HTTP 에러(4xx·5xx)와 네트워크 에러를 구분할 수 있게 status를 함께 담는다 (네트워크 에러는 0) */
@@ -171,6 +180,12 @@ export async function searchWords(q: string, signal?: AbortSignal): Promise<Word
   const query = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''
   const data = await request<{ words: WordSummary[] }>(`/api/words${query}`, { signal })
   return data.words
+}
+
+/** 단어 등록 (로그인 필요). 이미 있으면 기존 단어를 created: false로 돌려준다.
+ * 새 단어면 백엔드가 사전에서 뜻을 가져오느라 최대 5초쯤 걸릴 수 있다 */
+export async function createWord(word: string): Promise<{ word: CreatedWord; created: boolean }> {
+  return request<{ word: CreatedWord; created: boolean }>('/api/words', postJson({ word }))
 }
 
 export async function getWord(id: string, signal?: AbortSignal): Promise<WordDetail> {

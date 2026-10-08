@@ -518,3 +518,18 @@ h2,
   font-size: 0.8rem;
   color: var(--ink-soft);
 }
+
+/* ---------- 홈: 검색 결과가 없을 때 단어 등록 ---------- */
+
+.register-word {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.register-word__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
