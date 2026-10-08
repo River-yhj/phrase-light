@@ -23,7 +23,7 @@ Node.js 24 · TypeScript · Express 5 · Prisma + Supabase(PostgreSQL) · Passpo
 
 ## 로컬 실행
 
-백엔드를 먼저 켜고, 새 터미널에서 프론트엔드를 켭니다. Node.js 22.12 이상이 필요합니다 (Vite 8 요구사항).
+백엔드를 먼저 켜고, 새 터미널에서 프론트엔드를 켭니다. Node.js 24 이상이 필요합니다 (`package.json`의 `engines` 기준).
 
 ```bash
 # 1) 백엔드 — 저장소 루트, http://localhost:4000
