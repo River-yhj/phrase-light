@@ -317,3 +317,57 @@ h2,
     height: 180px;
   }
 }
+
+/* ---------- 단어 상세: 댓글 스레드 ---------- */
+
+.link-button {
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.story__comments {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.comments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 대댓글은 왼쪽 선으로 깊이를 보여준다 */
+.comments .comments {
+  margin-left: 14px;
+  padding-left: 12px;
+  border-left: 2px solid var(--accent-soft);
+}
+
+.comment {
+  padding: 6px 0;
+}
+
+.comment__meta {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.comment__author {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.comment__content {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

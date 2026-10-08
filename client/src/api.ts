@@ -46,6 +46,18 @@ export type Story = {
   _count: { comments: number }
 }
 
+/** GET /api/stories/:id/comments — parentId 기준으로 조립된 트리. 같은 레벨은 작성순 */
+export type Comment = {
+  id: string
+  content: string
+  createdAt: string
+  storyId: string
+  userId: string
+  parentId: string | null
+  user: Author
+  replies: Comment[]
+}
+
 /** GET /api/words/:id — stories는 voteCount 내림차순(동률이면 최신순) */
 export type WordDetail = {
   id: string
@@ -112,6 +124,11 @@ export async function searchWords(q: string, signal?: AbortSignal): Promise<Word
 export async function getWord(id: string, signal?: AbortSignal): Promise<WordDetail> {
   const data = await request<{ word: WordDetail }>(`/api/words/${encodeURIComponent(id)}`, { signal })
   return data.word
+}
+
+export async function getComments(storyId: string, signal?: AbortSignal): Promise<Comment[]> {
+  const data = await request<{ comments: Comment[] }>(`/api/stories/${encodeURIComponent(storyId)}/comments`, { signal })
+  return data.comments
 }
 
 /** DB에 저장된 이미지 상대경로("/uploads/...")를 브라우저가 불러올 수 있는 백엔드 절대 주소로 바꾼다 */
