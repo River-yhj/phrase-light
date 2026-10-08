@@ -58,7 +58,7 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
   그동안 등록한 단어는 전부 `meaning: null`이 됐다. 위키미디어가 운영해 가용성이 높은 Wiktionary로 바꿨다.
 - **엔드포인트**: `https://en.wiktionary.org/api/rest_v1/page/definition/{word}`
   - 공백은 `_`로 바꾼 뒤 `encodeURIComponent` (`kick the bucket` → `kick_the_bucket`)
-  - 응답의 `en` 배열에서 정의를 **품사를 가리지 않고 사전 순서대로 최대 5개** 저장한다 (아래 2026-10-08 변경 참고).
+  - 응답의 `en` 배열에서 정의를 **사전 순서대로, 품사별 최대 3개** 저장한다 (아래 2026-10-08 변경 참고).
     정의에 `<span>`·`<a>` 태그가 섞여 있어 태그를 지우고 HTML 엔티티를 풀어 평문으로 저장한다.
     태그를 지우면 빈 문자열이 되는 정의는 건너뛰고 5개에도 세지 않는다.
   - 위키미디어 API 정책에 따라 `User-Agent`에 앱 이름과 연락처를 넣는다
@@ -67,10 +67,13 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
 - **2026-10-08 변경 — `meaning`(String?) → `definitions`(Json?)**:
   - 문제: "첫 품사의 첫 정의" 하나만 저장하니 soapbox가 "A crate for packing soap."만 남고,
     이 사이트의 핵심인 비유적 의미(연설대, 의견을 늘어놓는 장)가 빠졌다.
-  - 형식: `[{ "partOfSpeech": "noun", "text": "..." }, ...]` — 품사는 소문자, Wiktionary `en` 배열 순서 유지, 최대 5개.
-    이제 soapbox는 1 비누 상자 / 2 즉석 연설대 / 3 의견을 밝히는 매체 / 4 비유적 의미 / 5 그 주제 까지 저장된다.
-  - 알려진 트레이드오프: 품사를 가리지 않고 앞에서 5개라, 한 품사의 정의가 5개 이상이면 뒤 품사는 빠진다
-    (예: hello는 감탄사 5개만 들어가고 명사·동사 뜻은 빠짐). 필요하면 "품사별 최대 N개"로 바꿀 것.
+  - 형식: `[{ "partOfSpeech": "noun", "text": "..." }, ...]` — 품사는 소문자, Wiktionary `en` 배열 순서 유지.
+  - 처음엔 품사를 가리지 않고 앞에서 5개를 잘랐는데, 한 품사의 정의가 5개 이상이면 뒤 품사가 통째로 빠졌다
+    (hello는 감탄사 5개만 남고 명사·동사 뜻이 빠짐). 같은 날 **품사별 최대 3개**로 바꿨다.
+    - 어원이 다르면 같은 품사가 여러 블록으로 나오므로, 블록이 아니라 품사 이름 기준으로 센다
+    - 결과: soapbox = noun 3개(비누 상자 / 즉석 연설대 / 의견을 밝히는 매체) + verb 1개(연설하다),
+      hello = interjection 3개 + noun 1개 + verb 1개, kick the bucket = verb 2개
+    - 대가: 한 품사의 4번째 이후 뜻은 빠진다 (soapbox의 "의견을 장황하게 늘어놓는 수단"은 noun 4번째라 제외됨)
   - API 응답 필드도 `definitions`. 검색(`GET /api/words?q=`)은 여전히 `word` 기준이다 (뜻 텍스트로는 검색 안 됨).
   - 단어가 0건인 것을 확인한 뒤 `meaning` 컬럼을 지우고 `definitions JSONB`를 추가했다 (데이터 이전 없음).
   - 구현 메모: Prisma `Json?` 필드는 일반 `null`로 쓰거나 필터할 수 없어서 `Prisma.DbNull`(DB의 NULL)을 쓴다.

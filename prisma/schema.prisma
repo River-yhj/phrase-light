@@ -35,7 +35,7 @@ model WordEntry {
   // 등록 API는 반드시 find-or-create(이미 있으면 재사용)로 구현한다.
   word        String   @unique
   // 외부 사전(Wiktionary)에서 등록 시 한 번 채우고 고정하는 뜻 목록 (수정 API 없음)
-  // 형식: [{ "partOfSpeech": "noun", "text": "..." }, ...] — 사전 순서 유지, 최대 5개
+  // 형식: [{ "partOfSpeech": "noun", "text": "..." }, ...] — 사전 순서 유지, 품사별 최대 3개
   // NULL = 아직 못 가져옴 (상세 조회 때 재시도 대상)
   definitions Json?
   userId      String

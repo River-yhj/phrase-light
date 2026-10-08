@@ -4,7 +4,7 @@
  * 소스: Wiktionary REST API (en.wiktionary.org)
  *   - 2026-09 dictionaryapi.dev가 3주 넘게 응답하지 않아 교체했다.
  *   - Wiktionary 콘텐츠는 CC BY-SA 라이선스라, 화면에 뜻을 보여줄 때 출처 표시가 필요하다.
- *   - 2026-10-08부터 첫 정의 1개가 아니라 정의 목록(최대 5개)을 저장한다.
+ *   - 2026-10-08부터 첫 정의 1개가 아니라 정의 목록을 저장한다 (2026-10-08 개정: 품사별 최대 3개).
  */
 
 const WIKTIONARY_DEFINITION_API = "https://en.wiktionary.org/api/rest_v1/page/definition/";
@@ -18,8 +18,9 @@ const TIMEOUT_MS = 5000;
 // definitions가 null인 단어를 상세 조회 때 다시 채울 때, 같은 단어로 외부 API를 반복 호출하지 않기 위한 간격
 const RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 
-// 품사를 가리지 않고 사전 순서대로 최대 몇 개까지 저장할지
-const MAX_DEFINITIONS = 5;
+// 품사별로 사전 순서대로 최대 몇 개까지 저장할지
+// (전체 상한이 아니라 품사마다 따로 센다 — 한 품사가 자리를 다 차지해 다른 품사가 빠지지 않도록)
+const MAX_DEFINITIONS_PER_POS = 3;
 
 /** WordEntry.definitions(Json)에 저장되는 항목 — Prisma Json 입력에 넣을 수 있도록 type alias로 둔다 */
 export type Definition = { partOfSpeech: string; text: string };
@@ -54,10 +55,11 @@ export function htmlToPlainText(html: string): string {
 }
 
 /**
- * Wiktionary 응답의 "en" 배열에서 정의를 순서대로 최대 MAX_DEFINITIONS개 꺼낸다.
+ * Wiktionary 응답의 "en" 배열에서 정의를 품사별로 최대 MAX_DEFINITIONS_PER_POS개씩 꺼낸다.
  * 응답 형태: { en: [{ partOfSpeech, language, definitions: [{ definition: "<html>" }] }], fr: [...] }
- * - 품사를 가리지 않고 사전 순서를 그대로 유지한다 (첫 정의만 쓰면 soapbox의 "연설대"처럼
- *   이 사이트의 핵심인 비유적 의미가 빠지기 때문)
+ * - 사전 순서를 그대로 유지한다 (첫 정의만 쓰면 soapbox의 "연설대"처럼 이 사이트의 핵심인
+ *   비유적 의미가 빠지고, 앞에서 N개만 자르면 hello처럼 한 품사가 자리를 다 차지해 다른 품사가 빠지기 때문)
+ * - 어원이 다르면 같은 품사가 여러 블록으로 나오므로, 블록이 아니라 품사 이름 기준으로 센다
  * - 태그를 지우고 나니 빈 문자열인 정의는 건너뛰고 개수에도 세지 않는다
  * - 하나도 없으면 빈 배열 대신 null (= 아직 못 가져옴, 재조회 대상)
  */
@@ -67,6 +69,7 @@ export function extractEnglishDefinitions(data: unknown): Definition[] | null {
   if (!Array.isArray(entries)) return null;
 
   const result: Definition[] = [];
+  const countByPos = new Map<string, number>();
   for (const entry of entries) {
     if (typeof entry !== "object" || entry === null) continue;
     const { partOfSpeech, definitions } = entry as { partOfSpeech?: unknown; definitions?: unknown };
@@ -79,8 +82,10 @@ export function extractEnglishDefinitions(data: unknown): Definition[] | null {
       if (typeof definition !== "string") continue;
       const text = htmlToPlainText(definition);
       if (!text) continue;
+      const count = countByPos.get(pos) ?? 0;
+      if (count >= MAX_DEFINITIONS_PER_POS) break;
+      countByPos.set(pos, count + 1);
       result.push({ partOfSpeech: pos, text });
-      if (result.length === MAX_DEFINITIONS) return result;
     }
   }
   return result.length > 0 ? result : null;
