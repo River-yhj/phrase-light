@@ -3,19 +3,14 @@ import type { Request, Response } from "express";
 import type { IdParams } from "../types/params.js";
 import { getUserId } from "../lib/auth.js";
 import { readTrimmedString } from "../lib/body.js";
-import { fetchDefinitions, retryFetchDefinitions } from "../lib/dictionary.js";
-import { authorSelect, isPrismaError, prisma } from "../lib/prisma.js";
+import { retryFetchDefinitions } from "../lib/dictionary.js";
+import { authorSelect, prisma } from "../lib/prisma.js";
+import { MAX_WORD_LENGTH, findOrCreateWordEntry, normalizeWord } from "../lib/wordEntries.js";
 
-const MAX_WORD_LENGTH = 100;
 const SEARCH_LIMIT = 20;
 
-/** "  Kick   The Bucket " → "kick the bucket" */
-function normalizeWord(raw: string): string {
-  return raw.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
 /**
- * POST /api/words — find-or-create
+ * POST /api/words — find-or-create (규칙은 lib/wordEntries.ts — 시드 스크립트와 공유)
  * 같은 단어가 이미 있으면 그대로 200으로 돌려주고, 없으면 사전에서 뜻을 채워 201로 생성한다.
  * definitions는 생성 시점에만 채우는 고정값이라 수정 API를 두지 않는다.
  */
@@ -31,32 +26,8 @@ export async function createWordEntry(req: Request, res: Response): Promise<void
     return;
   }
 
-  const existing = await prisma.wordEntry.findUnique({ where: { word } });
-  if (existing) {
-    res.status(200).json({ word: existing, created: false });
-    return;
-  }
-
-  // 사전 조회가 404·타임아웃 등으로 실패해도 null로 받고 등록은 계속한다
-  const definitions = await fetchDefinitions(word);
-
-  try {
-    const created = await prisma.wordEntry.create({
-      // Json 컬럼에 DB NULL을 넣으려면 null 대신 Prisma.DbNull을 써야 한다
-      data: { word, definitions: definitions ?? Prisma.DbNull, userId: getUserId(req) },
-    });
-    res.status(201).json({ word: created, created: true });
-  } catch (error) {
-    // 사전 조회를 기다리는 사이 다른 요청이 같은 단어를 먼저 만든 경우 — 그쪽을 반환한다
-    if (isPrismaError(error, "P2002")) {
-      const raced = await prisma.wordEntry.findUnique({ where: { word } });
-      if (raced) {
-        res.status(200).json({ word: raced, created: false });
-        return;
-      }
-    }
-    throw error;
-  }
+  const { entry, created } = await findOrCreateWordEntry(word, getUserId(req));
+  res.status(created ? 201 : 200).json({ word: entry, created });
 }
 
 /** GET /api/words?q=검색어 — q가 없으면 최근 등록순 */
