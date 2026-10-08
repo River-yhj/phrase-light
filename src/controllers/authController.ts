@@ -101,7 +101,8 @@ export function me(req: Request, res: Response): void {
 
 /** OAuth 콜백 성공 후 이동할 곳 (프론트엔드 연동 전에는 /api/auth/me로 보내 확인하기 쉽게 한다) */
 export function oauthSuccess(_req: Request, res: Response): void {
-  res.redirect(process.env.OAUTH_SUCCESS_REDIRECT ?? "/api/auth/me");
+  // .env에 키만 있고 값이 비어 있으면 ??로는 걸러지지 않아 redirect("")가 된다 — 빈 값도 미설정으로 본다
+  res.redirect(process.env.OAUTH_SUCCESS_REDIRECT?.trim() || "/api/auth/me");
 }
 
 /** OAuth 실패 시 */
