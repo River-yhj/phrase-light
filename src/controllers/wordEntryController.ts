@@ -43,28 +43,17 @@ export async function searchWordEntries(req: Request, res: Response): Promise<vo
       word: true,
       definitions: true,
       createdAt: true,
-      _count: { select: { stories: true } },
     },
   });
 
   res.json({ words });
 }
 
-/** GET /api/words/:id — 단어 상세 + stories (voteCount 내림차순) */
+/** GET /api/words/:id — 단어 상세 */
 export async function getWordEntry(req: Request<IdParams>, res: Response): Promise<void> {
   const word = await prisma.wordEntry.findUnique({
     where: { id: req.params.id },
-    include: {
-      user: { select: authorSelect },
-      stories: {
-        // 투표수가 같으면 최신 story를 위로
-        orderBy: [{ voteCount: "desc" }, { createdAt: "desc" }],
-        include: {
-          user: { select: authorSelect },
-          _count: { select: { comments: true } },
-        },
-      },
-    },
+    include: { user: { select: authorSelect } },
   });
 
   if (!word) {
@@ -90,20 +79,5 @@ export async function getWordEntry(req: Request<IdParams>, res: Response): Promi
     }
   }
 
-  // 로그인 사용자가 각 story에 추천했는지 (비로그인이면 전부 false) — 추천 버튼의 눌림 상태 표시용.
-  // story 수만큼 쿼리하지 않도록 이 단어의 story들에 대한 내 투표를 한 번에 가져온다.
-  const myVotes = req.isAuthenticated()
-    ? await prisma.vote.findMany({
-        where: { userId: req.user.id, storyId: { in: word.stories.map((story) => story.id) } },
-        select: { storyId: true },
-      })
-    : [];
-  const votedStoryIds = new Set(myVotes.map((vote) => vote.storyId));
-
-  res.json({
-    word: {
-      ...word,
-      stories: word.stories.map((story) => ({ ...story, votedByMe: votedStoryIds.has(story.id) })),
-    },
-  });
+  res.json({ word });
 }

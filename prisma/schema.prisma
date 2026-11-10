@@ -21,9 +21,6 @@ model User {
   createdAt    DateTime @default(now())
 
   wordEntries WordEntry[]
-  stories     Story[]
-  comments    Comment[]
-  votes       Vote[]
 
   // 같은 소셜 계정으로 중복 가입되는 것을 막는 실질적인 식별자
   @@unique([provider, providerId])
@@ -42,60 +39,5 @@ model WordEntry {
   user        User     @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())
 
-  stories Story[]
-
   @@index([userId])
-}
-
-model Story {
-  id          String    @id @default(cuid())
-  content     String
-  imageUrl    String?
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  wordEntryId String
-  wordEntry   WordEntry @relation(fields: [wordEntryId], references: [id])
-  createdAt   DateTime  @default(now())
-
-  // Vote 개수를 매번 집계하지 않고 미리 계산해두는 카운터.
-  // 투표/취소 시 트랜잭션으로 Vote 생성·삭제와 함께 +1/-1 갱신한다.
-  voteCount Int @default(0)
-
-  comments Comment[]
-  votes    Vote[]
-
-  @@index([userId])
-  @@index([wordEntryId])
-  @@index([wordEntryId, voteCount])
-}
-
-model Comment {
-  id        String    @id @default(cuid())
-  content   String
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  storyId   String
-  // Story를 지우면 달린 댓글도 함께 지운다
-  story     Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  parentId  String?
-  // 부모 댓글을 지우면 대댓글 스레드 전체를 함께 지운다 (SetNull이면 대댓글이 최상위로 떠버림)
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   Comment[] @relation("CommentReplies")
-  createdAt DateTime  @default(now())
-
-  @@index([storyId])
-  @@index([parentId])
-}
-
-// User <-> Story 업보트: N:M 관계를 나타내는 조인 테이블
-model Vote {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  storyId   String
-  // Story를 지우면 투표 기록도 함께 지운다
-  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@unique([userId, storyId])
 }

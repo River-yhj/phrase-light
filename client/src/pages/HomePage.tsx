@@ -41,7 +41,6 @@ export default function HomePage() {
                   <span className="word-card__preview">
                     {word.definitions?.[0]?.text ?? '사전에서 찾을 수 없는 표현입니다'}
                   </span>
-                  <span className="word-card__meta">이야기 {word._count.stories}개</span>
                 </Link>
               </li>
             ))}

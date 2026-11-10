@@ -30,11 +30,3 @@ export function requireOwnership(loadOwner: OwnerLoader) {
     next();
   };
 }
-
-export const requireStoryOwner = requireOwnership((id) =>
-  prisma.story.findUnique({ where: { id }, select: { userId: true } })
-);
-
-export const requireCommentOwner = requireOwnership((id) =>
-  prisma.comment.findUnique({ where: { id }, select: { userId: true } })
-);

@@ -30,35 +30,9 @@ export type WordSummary = {
   /** null = 사전에서 아직 못 가져옴 (사전에 없는 표현일 수 있음) */
   definitions: Definition[] | null
   createdAt: string
-  _count: { stories: number }
 }
 
-export type Story = {
-  id: string
-  content: string
-  /** "/uploads/<파일명>" 형태의 상대경로. 표시할 때는 imageSrc()로 백엔드 주소를 붙인다 */
-  imageUrl: string | null
-  voteCount: number
-  createdAt: string
-  userId: string
-  wordEntryId: string
-  user: Author
-  _count: { comments: number }
-}
-
-/** GET /api/stories/:id/comments — parentId 기준으로 조립된 트리. 같은 레벨은 작성순 */
-export type Comment = {
-  id: string
-  content: string
-  createdAt: string
-  storyId: string
-  userId: string
-  parentId: string | null
-  user: Author
-  replies: Comment[]
-}
-
-/** GET /api/words/:id — stories는 voteCount 내림차순(동률이면 최신순) */
+/** GET /api/words/:id */
 export type WordDetail = {
   id: string
   word: string
@@ -66,7 +40,6 @@ export type WordDetail = {
   createdAt: string
   userId: string
   user: Author
-  stories: Story[]
 }
 
 /** 로그인한 본인 정보 (GET /api/auth/me, 로그인·가입 응답). 비밀번호 해시는 백엔드가 빼고 준다 */
@@ -173,7 +146,7 @@ export function oauthLoginUrl(provider: OAuthProvider): string {
   return `${API_URL}/api/auth/${provider}`
 }
 
-// ---------- 엔드포인트: 단어·story ----------
+// ---------- 엔드포인트: 단어 ----------
 
 /** 단어 검색. q가 비어 있으면 최근 등록된 단어를 돌려준다 (최대 20개) */
 export async function searchWords(q: string, signal?: AbortSignal): Promise<WordSummary[]> {
@@ -191,11 +164,6 @@ export async function createWord(word: string): Promise<{ word: CreatedWord; cre
 export async function getWord(id: string, signal?: AbortSignal): Promise<WordDetail> {
   const data = await request<{ word: WordDetail }>(`/api/words/${encodeURIComponent(id)}`, { signal })
   return data.word
-}
-
-export async function getComments(storyId: string, signal?: AbortSignal): Promise<Comment[]> {
-  const data = await request<{ comments: Comment[] }>(`/api/stories/${encodeURIComponent(storyId)}/comments`, { signal })
-  return data.comments
 }
 
 /** DB에 저장된 이미지 상대경로("/uploads/...")를 브라우저가 불러올 수 있는 백엔드 절대 주소로 바꾼다 */

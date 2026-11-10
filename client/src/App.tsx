@@ -26,9 +26,9 @@ export default function App() {
         </Routes>
       </main>
 
-      {/* 모든 페이지 하단에 노출하는 디스클레이머 (decision-log: 서비스 컨셉) */}
+      {/* 단어 뜻은 Wiktionary(CC BY-SA)에서 가져온다 — 단어 상세에는 항목별 출처 링크가 따로 있다 */}
       <footer className="site-footer">
-        여기 실린 이야기는 검증된 학술 정보가 아니라 커뮤니티가 함께 만들어가는 설(說)입니다.
+        단어 뜻은 Wiktionary에서 가져오며 CC BY-SA 라이선스를 따릅니다.
       </footer>
     </div>
   )

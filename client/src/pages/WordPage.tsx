@@ -1,8 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useParams } from 'react-router'
-import { getWord, imageSrc, type Definition, type Story } from '../api'
-import CommentThread from '../components/CommentThread'
-import { Empty, ErrorMessage, Loading } from '../components/Status'
+import { getWord, type Definition } from '../api'
+import { ErrorMessage, Loading } from '../components/Status'
 import { useAsync } from '../useAsync'
 
 const CC_BY_SA_URL = 'https://creativecommons.org/licenses/by-sa/4.0/'
@@ -23,13 +22,6 @@ function groupByPartOfSpeech(definitions: Definition[]): [string, string[]][] {
   return [...groups.entries()]
 }
 
-/** 백엔드가 이미 voteCount 내림차순으로 주지만, 화면 요구사항이라 한 번 더 보장한다 (안정 정렬이라 동률 순서는 유지) */
-function byVotes(stories: Story[]): Story[] {
-  return [...stories].sort((a, b) => b.voteCount - a.voteCount)
-}
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' })
-
 export default function WordPage() {
   const { id = '' } = useParams()
   const load = useCallback((signal: AbortSignal) => getWord(id, signal), [id])
@@ -39,7 +31,6 @@ export default function WordPage() {
   if (state.status === 'error') return <ErrorMessage error={state.error} notFound="단어를 찾을 수 없습니다." />
 
   const word = state.data
-  const stories = byVotes(word.stories)
 
   return (
     <article>
@@ -75,60 +66,6 @@ export default function WordPage() {
           </>
         )}
       </header>
-
-      <section>
-        <h2 className="section-title">이야기 {stories.length}개</h2>
-        {stories.length === 0 ? (
-          <Empty>아직 이 단어에 얽힌 이야기가 없습니다.</Empty>
-        ) : (
-          <ol className="story-list">
-            {stories.map((story) => (
-              <StoryCard key={story.id} story={story} word={word.word} />
-            ))}
-          </ol>
-        )}
-      </section>
     </article>
-  )
-}
-
-function StoryCard({ story, word }: { story: Story; word: string }) {
-  const [showComments, setShowComments] = useState(false)
-  const commentCount = story._count.comments
-  const threadId = `comments-${story.id}`
-
-  return (
-    <li className="story">
-      {story.imageUrl && (
-        <img className="story__thumb" src={imageSrc(story.imageUrl)} alt={`${word} 이야기 첨부 이미지`} loading="lazy" />
-      )}
-      <div className="story__body">
-        <p className="story__content">{story.content}</p>
-        <p className="story__meta">
-          <span>{story.user.name ?? '이름 없음'}</span>
-          <span className="story__votes">추천 {story.voteCount}</span>
-          <time dateTime={story.createdAt}>{dateFormat.format(new Date(story.createdAt))}</time>
-          {commentCount === 0 ? (
-            <span>댓글 0</span>
-          ) : (
-            <button
-              type="button"
-              className="link-button"
-              aria-expanded={showComments}
-              aria-controls={threadId}
-              onClick={() => setShowComments((open) => !open)}
-            >
-              {showComments ? `댓글 ${commentCount}개 접기` : `댓글 ${commentCount}개 보기`}
-            </button>
-          )}
-        </p>
-        {/* 펼쳤을 때만 마운트 → 그때 처음 스레드를 불러온다 */}
-        {showComments && (
-          <div id={threadId} className="story__comments">
-            <CommentThread storyId={story.id} />
-          </div>
-        )}
-      </div>
-    </li>
   )
 }
