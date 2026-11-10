@@ -66,5 +66,5 @@ app.use(errorHandler);
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => {
-  console.log(`mutho-root api listening on :${port}`);
+  console.log(`phrase-light api listening on :${port}`);
 });

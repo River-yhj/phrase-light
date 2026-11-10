@@ -11,9 +11,9 @@ export default function App() {
     <div className="layout">
       <header className="site-header">
         <Link to="/" className="brand">
-          MuthoRoot
+          PhraseLight
         </Link>
-        <span className="tagline">단어에 얽힌 이야기</span>
+        <span className="tagline">문장 속 영어 표현 사전</span>
         <AuthNav />
       </header>
 

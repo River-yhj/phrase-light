@@ -1,4 +1,4 @@
-# MuthoRoot
+# PhraseLight
 
 @docs/decision-log.md
 

@@ -10,7 +10,7 @@
 const WIKTIONARY_DEFINITION_API = "https://en.wiktionary.org/api/rest_v1/page/definition/";
 
 // Wikimedia API 정책상 앱 이름과 연락처를 담은 User-Agent를 보내야 한다
-const USER_AGENT = "MuthoRoot/0.1 (https://github.com/River-yhj/mutho-root)";
+const USER_AGENT = "PhraseLight/0.1 (https://github.com/River-yhj/phrase-light)";
 
 // 사전 조회는 단어 등록의 부가 정보일 뿐이므로, 오래 걸리면 기다리지 않고 뜻 없이(null) 진행한다
 const TIMEOUT_MS = 5000;
