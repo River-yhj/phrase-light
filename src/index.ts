@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import session from "express-session";
 import passport from "./lib/passport.js";
+import { analyzeRouter } from "./routes/analyze.js";
 import { authRouter } from "./routes/auth.js";
 import { wordEntryRouter } from "./routes/words.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
@@ -57,6 +58,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/words", wordEntryRouter);
+app.use("/api/analyze", analyzeRouter);
 
 app.use(errorHandler);
 

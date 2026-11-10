@@ -55,6 +55,31 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
 - `User` N:M `Story` — `Vote` 조인 테이블로 업보트 표현 (N:M 요건 충족)
 - `Root` 모델은 아직 스키마에 없음 (위 스코프 결정 참고)
 
+## 문장 분석기 (2026-11-10)
+
+`POST /api/analyze { text }` — 붙여넣은 영어 글(최대 5,000자)에서 사전에 등록된 단어·숙어를 찾아
+원문 위치(`start`, `end`), 원문에 쓰인 형태(`matchedText`), 첫 뜻을 돌려준다. 로그인 없이 쓸 수 있다.
+
+- **로직은 `src/lib/analyzer.ts`의 순수 함수**로 두고 단위 테스트(`npm test`, `src/lib/analyzer.test.ts`)로 규칙을 고정했다.
+  DB를 모르는 함수라 테스트에 DB가 필요 없다.
+- **찾는 규칙**
+  - 대소문자, 굽은 따옴표(’)는 구분하지 않는다.
+  - 활용형을 같은 표현으로 본다: -s/-es/-ies, -ed/-ied, -ing(e 탈락·자음 겹침·ying→ie), 그리고 숙어에 자주 나오는
+    불규칙 동사 80여 개(break/broke/broken, steal/stole, spill/spilt …). 표제어 쪽과 원문 쪽의 원형 후보가 하나라도
+    겹치면 같은 단어로 본다 (그래서 표제어 `cry over spilled milk`가 원문 `spilt milk`와도 맞는다).
+    - 엄밀한 형태소 분석이 아니라 넉넉한 후보 목록이다. 후보가 틀려도 표제어와 겹치지 않으면 아무 일도 없어서 넓게 잡았다.
+  - Wiktionary 표제어의 자리 표시를 맞춘다: `one's`·`someone's` ↔ my/your/his/her/its/our/their/○○'s,
+    `oneself` ↔ myself 등, `someone`·`something` ↔ 아무 단어 하나.
+  - 숙어 단어 사이에는 공백·줄바꿈·하이픈만 올 수 있다. 쉼표·마침표를 건너 맞추지 않는다 (`I kick. The bucket…` ✗).
+    하이픈과 공백은 같게 본다 (`wild-goose chase` = `wild goose chase`).
+  - 겹치면 단어 수가 많은 숙어를 남긴다 → 글자 수 → 앞에 나온 것 순. `break the ice` 안의 `ice`는 따로 잡지 않는다.
+  - 위치는 JS 문자열 인덱스(UTF-16)다. 프론트도 JS 문자열이라 그대로 잘라 쓰면 된다.
+- **색인 캐시 (`src/lib/phraseIndex.ts`)**: 등록된 단어 전체로 만든 색인을 메모리에 둔다. 단어는 지워지거나 표제어가 바뀌지
+  않고 늘어나기만 하므로, 분석할 때마다 (단어 수, 마지막 등록 시각)만 확인하고 달라졌을 때만 다시 만든다.
+  다른 프로세스(시드 스크립트)가 넣은 단어도 서버 재시작 없이 반영된다.
+- 입력 검증은 `src/lib/body.ts`의 `readText` 한 곳에서 한다 (이전 story·comment의 `readContent`를 필드 이름을 받도록 일반화).
+  여러 줄 입력은 줄바꿈·탭만 허용하고, 한 줄 입력(노트 제목)은 제어 문자를 하나도 허용하지 않는다.
+
 ## 사전 API — Wiktionary (2026-10-07 교체)
 
 `WordEntry.definitions`는 외부 사전에서 한 번 채우고 고정한다 (수정 API 없음). 조회 로직은 `src/lib/dictionary.ts` 한 곳에 있다.
