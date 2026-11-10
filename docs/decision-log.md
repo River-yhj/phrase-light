@@ -80,6 +80,31 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
 - 입력 검증은 `src/lib/body.ts`의 `readText` 한 곳에서 한다 (이전 story·comment의 `readContent`를 필드 이름을 받도록 일반화).
   여러 줄 입력은 줄바꿈·탭만 허용하고, 한 줄 입력(노트 제목)은 제어 문자를 하나도 허용하지 않는다.
 
+## 분석 노트 (2026-11-10)
+
+사용자가 쓰고 고치고 지우는 데이터. 분석한 영어 글을 제목·출처 사진과 함께 저장한다.
+
+- **모델**: `Note`(제목 최대 100자 한 줄, 원문 최대 5,000자, 출처 사진 `sourceImageUrl`, `updatedAt`) +
+  `NoteMatch`(노트, 단어, `matchedText`, `start`, `end`). `NoteMatch`가 `Note` N:M `WordEntry`를 잇는다.
+  - 노트를 지우면 `NoteMatch`도 지운다(Cascade). 단어는 지우지 않으므로 `WordEntry` 쪽은 RESTRICT 그대로.
+- **찾은 표현은 저장할 때 계산해 둔다**: 노트를 만들거나 원문을 고칠 때 문장 분석기를 돌려 `NoteMatch`를 다시 만든다
+  (한 번의 `update` 안에서 `deleteMany` + `createMany` — Prisma가 중첩 쓰기를 한 트랜잭션으로 처리).
+  제목·사진만 바꾸면 그대로 둔다.
+  - 그래서 노트를 저장한 뒤에 사전에 새로 등록된 단어는, 원문을 다시 저장하기 전까지 그 노트에 나타나지 않는다.
+    대신 단어 상세의 "내 노트 속 용례"를 DB 조회 한 번으로 만들 수 있다 (노트 원문을 매번 다시 분석하지 않음).
+- **작성자만 볼 수 있다**: 목록은 내 노트만, `GET/PATCH/DELETE /api/notes/:id`는 `requireNoteOwner`가 확인한다.
+  남의 노트는 403이 아니라 **404**로 응답해 존재 여부도 숨긴다 (`requireOwnership`에 `hideFromOthers` 옵션 추가).
+- **출처 사진**: 이전 story 이미지 업로드 로직(`src/lib/storage.ts`)을 그대로 쓴다 — 매직 바이트 검사, 5MB, 고아 파일 정리,
+  PATCH 미들웨어 순서 requireAuth → 소유권 확인 → multer(남의 노트에 보낸 파일은 디스크에 안 쓰임).
+- **목록**: 최근 수정순, 제목 검색(`?q=`, 대소문자 무시), 최대 50개. 원문 전체 대신 앞 120자 미리보기와 찾은 표현 수만 준다.
+- **내 노트 속 용례**: `GET /api/words/:id`의 `myExamples` — 로그인 사용자의 노트 중 이 단어가 나온 문장
+  (최근 수정한 노트부터 최대 20개). 문장은 `extractSentence`가 마침표·물음표·느낌표·줄바꿈 기준으로 잘라내고,
+  240자가 넘으면 표현을 가운데 두고 줄여 앞뒤에 "…"를 붙인다. `start`/`end`는 잘라낸 문장 기준 위치다.
+- **확인 (2026-11-10)**: 이 작업 환경에서는 Prisma 엔진 다운로드(binaries.prisma.sh)가 막혀 있어서, 테스트 전용으로 복사한
+  저장소에서 pg 드라이버 어댑터 클라이언트로 바꿔 임시 Postgres에 마이그레이션 5개를 적용한 뒤 실제 서버로 19개 항목을 확인했다
+  (노트 CRUD, 남의 노트 404, 이미지 검증·교체·제거·삭제와 uploads/ 파일 수, 원문 수정 시 재분석, myExamples, 색인 캐시 갱신,
+  입력 검증, 사라진 story API 404). 저장소 코드는 기본 엔진 그대로다. 실제 Supabase와 Wiktionary 연동은 개발 PC에서 확인한다.
+
 ## 사전 API — Wiktionary (2026-10-07 교체)
 
 `WordEntry.definitions`는 외부 사전에서 한 번 채우고 고정한다 (수정 API 없음). 조회 로직은 `src/lib/dictionary.ts` 한 곳에 있다.
@@ -181,7 +206,8 @@ etymonline 같은 어원 사전에서 출발했지만, "학술적으로 검증�
        (이모지 10,000개는 UTF-16으로 20,000이지만 10,000자로 센다)
      - PATCH에서는 content를 아예 안 보내면 "변경 없음"이지만, 보냈는데 비어 있으면 400
      - 수정·삭제는 소유권 검사가 먼저라, 남의 글이면 내용과 상관없이 403
-3. 이미지 업로드 (multer, Story에 첨부) — **완료 (2026-10-07)**
+3. 이미지 업로드 (multer, Story에 첨부) — **완료 (2026-10-07)**, 2026-11-10부터 분석 노트의 출처 사진에 쓴다
+   - 아래 규칙은 그대로 유효하다. 필드만 `Story.imageUrl` → `Note.sourceImageUrl`로 바뀌었다.
    - multer 2.x로 로컬 디스크 `uploads/`에 저장, Story당 1장 (기존 `Story.imageUrl` 사용, 스키마 변경 없음)
    - 파일명은 원본 이름 대신 `crypto.randomUUID()` + 확장자. 확장자는 원본 파일명도, 클라이언트가 보낸
      MIME도 아닌 **파일 시그니처(매직 바이트)** 기준으로 정한다 (jpeg/png/webp/gif만 허용, 최대 5MB)

@@ -14,6 +14,9 @@
  *   - 표현이 겹치면 단어 수가 더 많은 숙어를 남긴다 (break the ice 안의 ice는 따로 잡지 않음).
  */
 
+/** 한 번에 분석할 수 있는 글의 최대 길이 — 분석 노트 원문 제한과 같다 */
+export const MAX_ANALYZE_TEXT_LENGTH = 5_000;
+
 export type PhraseEntry = { id: string; word: string };
 
 export type PhraseMatch = {

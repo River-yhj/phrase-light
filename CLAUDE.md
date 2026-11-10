@@ -15,4 +15,6 @@
 
 - Express 5부터 비동기 핸들러의 에러가 자동으로 에러 미들웨어까지 전달된다 — 매번 try/catch로 감쌀 필요 없음
 - multer 업로드 저장 경로는 `uploads/`이며 `.gitignore`에 의해 git에는 포함되지 않는다
+- 분석 노트는 작성자만 볼 수 있다. 남의 노트는 403이 아니라 404로 응답한다 (`requireNoteOwner`, 존재 여부도 숨김)
+- 문장 분석 규칙은 `src/lib/analyzer.ts`에만 둔다. 규칙을 바꾸면 `src/lib/analyzer.test.ts`도 함께 고치고 `npm test`를 돌린다
 - 세션 기반 로그인과 Google/Kakao OAuth가 공존하므로, 인증 미들웨어는 `req.isAuthenticated()` 기준으로 통일한다

@@ -25,6 +25,15 @@ const MAX_DEFINITIONS_PER_POS = 3;
 /** WordEntry.definitions(Json)에 저장되는 항목 — Prisma Json 입력에 넣을 수 있도록 type alias로 둔다 */
 export type Definition = { partOfSpeech: string; text: string };
 
+/** definitions(Json)에서 첫 뜻을 꺼낸다 (분석 결과·노트의 미리보기용). 없거나 형식이 다르면 null */
+export function firstDefinition(definitions: unknown): Definition | null {
+  if (!Array.isArray(definitions)) return null;
+  const first: unknown = definitions[0];
+  if (typeof first !== "object" || first === null) return null;
+  const { partOfSpeech, text } = first as Record<string, unknown>;
+  return typeof partOfSpeech === "string" && typeof text === "string" ? { partOfSpeech, text } : null;
+}
+
 /** "kick the bucket" → "kick_the_bucket" (Wiktionary 문서 제목 규칙) → URL 인코딩 */
 function toWiktionarySlug(word: string): string {
   return encodeURIComponent(word.replace(/ /g, "_"));

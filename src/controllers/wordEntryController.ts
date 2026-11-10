@@ -3,11 +3,13 @@ import type { Request, Response } from "express";
 import type { IdParams } from "../types/params.js";
 import { getUserId } from "../lib/auth.js";
 import { readTrimmedString } from "../lib/body.js";
+import { extractSentence } from "../lib/analyzer.js";
 import { retryFetchDefinitions } from "../lib/dictionary.js";
 import { authorSelect, prisma } from "../lib/prisma.js";
 import { MAX_WORD_LENGTH, findOrCreateWordEntry, normalizeWord } from "../lib/wordEntries.js";
 
 const SEARCH_LIMIT = 20;
+const EXAMPLE_LIMIT = 20;
 
 /**
  * POST /api/words — find-or-create (규칙은 lib/wordEntries.ts — 시드 스크립트와 공유)
@@ -49,7 +51,11 @@ export async function searchWordEntries(req: Request, res: Response): Promise<vo
   res.json({ words });
 }
 
-/** GET /api/words/:id — 단어 상세 */
+/**
+ * GET /api/words/:id — 단어 상세 + 내 노트 속 용례(myExamples)
+ * myExamples는 로그인 사용자의 분석 노트 중 이 표현이 나온 문장이다 (최근 수정한 노트부터, 최대 20개).
+ * 비로그인이면 빈 배열.
+ */
 export async function getWordEntry(req: Request<IdParams>, res: Response): Promise<void> {
   const word = await prisma.wordEntry.findUnique({
     where: { id: req.params.id },
@@ -79,5 +85,18 @@ export async function getWordEntry(req: Request<IdParams>, res: Response): Promi
     }
   }
 
-  res.json({ word });
+  const myMatches = req.isAuthenticated()
+    ? await prisma.noteMatch.findMany({
+        where: { wordEntryId: word.id, note: { userId: req.user.id } },
+        orderBy: [{ note: { updatedAt: "desc" } }, { start: "asc" }],
+        take: EXAMPLE_LIMIT,
+        select: { start: true, end: true, note: { select: { id: true, title: true, text: true } } },
+      })
+    : [];
+  const myExamples = myMatches.map(({ start, end, note }) => {
+    const excerpt = extractSentence(note.text, start, end);
+    return { noteId: note.id, noteTitle: note.title, sentence: excerpt.sentence, start: excerpt.start, end: excerpt.end };
+  });
+
+  res.json({ word: { ...word, myExamples } });
 }
